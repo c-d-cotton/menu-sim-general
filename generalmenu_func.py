@@ -2,57 +2,11 @@
 """{{{1
 Solve for menu costs equilibria.
 }}}1"""
-# PYTHON_PREAMBLE_START_STANDARD:{{{
-
-# Christopher David Cotton (c)
-# http://www.cdcotton.com
-
-# modules needed for preamble
-import importlib
 import os
 from pathlib import Path
 import sys
 
-# Get full real filename
-__fullrealfile__ = os.path.abspath(__file__)
-
-# Function to get git directory containing this file
-def getprojectdir(filename):
-    curlevel = filename
-    while curlevel is not '/':
-        curlevel = os.path.dirname(curlevel)
-        if os.path.exists(curlevel + '/.git/'):
-            return(curlevel + '/')
-    return(None)
-
-# Directory of project
-__projectdir__ = Path(getprojectdir(__fullrealfile__))
-
-# Function to call functions from files by their absolute path.
-# Imports modules if they've not already been imported
-# First argument is filename, second is function name, third is dictionary containing loaded modules.
-modulesdict = {}
-def importattr(modulefilename, func, modulesdict = modulesdict):
-    # get modulefilename as string to prevent problems in <= python3.5 with pathlib -> os
-    modulefilename = str(modulefilename)
-    # if function in this file
-    if modulefilename == __fullrealfile__:
-        return(eval(func))
-    else:
-        # add file to moduledict if not there already
-        if modulefilename not in modulesdict:
-            # check filename exists
-            if not os.path.isfile(modulefilename):
-                raise Exception('Module not exists: ' + modulefilename + '. Function: ' + func + '. Filename called from: ' + __fullrealfile__ + '.')
-            # add directory to path
-            sys.path.append(os.path.dirname(modulefilename))
-            # actually add module to moduledict
-            modulesdict[modulefilename] = importlib.import_module(''.join(os.path.basename(modulefilename).split('.')[: -1]))
-
-        # get the actual function from the file and return it
-        return(getattr(modulesdict[modulefilename], func))
-
-# PYTHON_PREAMBLE_END:}}}
+__projectdir__ = Path(os.path.dirname(os.path.realpath(__file__)) + '/')
 
 import copy
 import datetime
@@ -116,7 +70,9 @@ def vfidiscrete(profitarray, endogstate, transmissionarray, beta, menucost, infl
             raise ValueError('Need to add this.')
         else:
             endogstate_unchanged = endogstate / (1 + inflation)
-            firstnonzeroweightindex, weightonfirst, firstindexonly, lastindexonly = importattr(__projectdir__ / Path('submodules/python-math-func/dist_func.py'), 'weightvalue_orderedlist')(endogstate_unchanged, endogstate)
+            sys.path.append(str(__projectdir__ / Path('submodules/python-math-func/')))
+            from dist_func import weightvalue_orderedlist
+            firstnonzeroweightindex, weightonfirst, firstindexonly, lastindexonly = weightvalue_orderedlist(endogstate_unchanged, endogstate)
             firstnonzeroweightindex_p1 = [index + 1 for index in firstnonzeroweightindex]
             # make weightonfirst a list
             weightonfirst = np.array(weightonfirst)
@@ -520,17 +476,25 @@ def getpolprobs(pol, inflation, pol_pi = None, num_pol_pi = 100):
 
 
     for s2 in range(ns2):
-        probabovelowbound = importattr(__projectdir__ / Path('submodules/python-math-func/dist_func.py'), 'intervals_gt')(pol[s2][1], midpoints)
-        probabovehighbound = importattr(__projectdir__ / Path('submodules/python-math-func/dist_func.py'), 'intervals_gt')(pol[s2][2], midpoints)
+        sys.path.append(str(__projectdir__ / Path('submodules/python-math-func/')))
+        from dist_func import intervals_gt
+        probabovelowbound = intervals_gt(pol[s2][1], midpoints)
+        sys.path.append(str(__projectdir__ / Path('submodules/python-math-func/')))
+        from dist_func import intervals_gt
+        probabovehighbound = intervals_gt(pol[s2][2], midpoints)
         # probability that a firm with productivity state s2 will change over different previous price states s1
         probnochange = np.concatenate(([0], np.array(probabovehighbound) - np.array(probabovelowbound), [0]))
 
         # rewrite pstar as probability of discrete price states
-        pstarvec = importattr(__projectdir__ / Path('submodules/python-math-func/dist_func.py'), 'weightvaluediscretevec')(pol[s2][0], pol_pi)
+        sys.path.append(str(__projectdir__ / Path('submodules/python-math-func/')))
+        from dist_func import weightvaluediscretevec
+        pstarvec = weightvaluediscretevec(pol[s2][0], pol_pi)
 
         for s1 in range(ns1):
             probnochange_thisone = probnochange[s1]
-            pnochangevec = importattr(__projectdir__ / Path('submodules/python-math-func/dist_func.py'), 'weightvaluediscretevec')(pol_pi[s1] / (1 + inflation), pol_pi)
+            sys.path.append(str(__projectdir__ / Path('submodules/python-math-func/')))
+            from dist_func import weightvaluediscretevec
+            pnochangevec = weightvaluediscretevec(pol_pi[s1] / (1 + inflation), pol_pi)
 
             polprobs[s1, s2] = probnochange_thisone * np.array(pnochangevec) + (1 - probnochange_thisone) * np.array(pstarvec)
 
@@ -575,13 +539,19 @@ def getdist_continuous_menu(transmissionarray, polprobs, checks = False):
 
     if False:
         # get probability of moving from (s1, s2) to (s1', s2')
-        transmissionstararray = importattr(__projectdir__ / Path('submodules/vfi-general/vfi_1endogstate_func.py'), 'gentransmissionstararray_1endogstate_polprobs')(transmissionarray, polprobs)
+        sys.path.append(str(__projectdir__ / Path('submodules/vfi-general/')))
+        from vfi_1endogstate_func import gentransmissionstararray_1endogstate_polprobs
+        transmissionstararray = gentransmissionstararray_1endogstate_polprobs(transmissionarray, polprobs)
         
         ns1 = np.shape(polprobs)[0]
-        fullstatedist, endogstatedist = importattr(__projectdir__ / Path('submodules/vfi-general/vfi_1endogstate_func.py'), 'getstationarydist_1endogstate_full')(transmissionstararray, ns1)
+        sys.path.append(str(__projectdir__ / Path('submodules/vfi-general/')))
+        from vfi_1endogstate_func import getstationarydist_1endogstate_full
+        fullstatedist, endogstatedist = getstationarydist_1endogstate_full(transmissionstararray, ns1)
 
     else:
-        fullstatedist, endogstatedist = importattr(__projectdir__ / Path('submodules/vfi-general/vfi_1endogstate_func.py'), 'getstationarydist_1endogstate_direct')(transmissionarray, polprobs, crit = 1e-9)
+        sys.path.append(str(__projectdir__ / Path('submodules/vfi-general/')))
+        from vfi_1endogstate_func import getstationarydist_1endogstate_direct
+        fullstatedist, endogstatedist = getstationarydist_1endogstate_direct(transmissionarray, polprobs, crit = 1e-9)
 
     return(fullstatedist, endogstatedist)
 
@@ -700,13 +670,17 @@ def getparamssdict(p = None):
             # raising num_A does seem to make a difference and raises MC and NU for a given iteration
             p['num_A'] = 100
 
-        logAval, p['transmissionarray'] = importattr(__projectdir__ / Path('submodules/python-math-func/dist_func.py'), 'values_markov_normal')(p['num_A'], rho = p['rho_A'], sdshock = p['sd_Ashock'])
+        sys.path.append(str(__projectdir__ / Path('submodules/python-math-func/')))
+        from dist_func import values_markov_normal
+        logAval, p['transmissionarray'] = values_markov_normal(p['num_A'], rho = p['rho_A'], sdshock = p['sd_Ashock'])
         p['Aval'] = np.exp(logAval)
 
     else:
         p['num_A'] = len(p['Aval'])
     # add probabilities of getting Aval
-    p['Aprobs'] = importattr(__projectdir__ / Path('submodules/python-math-func/markov_func.py'), 'getstationarydist')(p['transmissionarray'])
+    sys.path.append(str(__projectdir__ / Path('submodules/python-math-func/')))
+    from markov_func import getstationarydist
+    p['Aprobs'] = getstationarydist(p['transmissionarray'])
 
 
     if p['continuousV'] is False:
@@ -777,7 +751,9 @@ def polrough1_p(p):
     # prices that policy function relate to
     p['pol_pi'] = p['p_i']
 
-    p['polprobs'] = importattr(__projectdir__ / Path('submodules/vfi-general/vfi_1endogstate_func.py'), 'getpolprobs_1endogstate_continuous')(p['pol'], p['pol_pi'])
+    sys.path.append(str(__projectdir__ / Path('submodules/vfi-general/')))
+    from vfi_1endogstate_func import getpolprobs_1endogstate_continuous
+    p['polprobs'] = getpolprobs_1endogstate_continuous(p['pol'], p['pol_pi'])
 
     p['fullstatedist'], p['endogstatedist'] = getdist_continuous_menu(p['transmissionarray'], p['polprobs'])
 
@@ -797,7 +773,9 @@ def polrough2_p(p):
     # prices that policy function relate to
     p['pol_pi'] = p['p_i']
 
-    p['polprobs'] = importattr(__projectdir__ / Path('submodules/vfi-general/vfi_1endogstate_func.py'), 'getpolprobs_1endogstate_continuous')(p['pol'], p['pol_pi'])
+    sys.path.append(str(__projectdir__ / Path('submodules/vfi-general/')))
+    from vfi_1endogstate_func import getpolprobs_1endogstate_continuous
+    p['polprobs'] = getpolprobs_1endogstate_continuous(p['pol'], p['pol_pi'])
 
     p['fullstatedist'], p['endogstatedist'] = getdist_continuous_menu(p['transmissionarray'], p['polprobs'])
 
@@ -1578,7 +1556,7 @@ def interpolatepistar(pistar):
     Read pistars from folder and then interpolate them to get estimates of MC, NU and menushare in that case
     pistar should be in range of pistars in folder
     """
-    pistars, retdictlist = importattr(__projectdir__ / Path('generalmenu_func.py'), 'loadsingleparamfolder')(__projectdir__ / Path('temp/pistars/'))
+    pistars, retdictlist = loadsingleparamfolder(__projectdir__ / Path('temp/pistars/'))
 
     MClist = [retdict['MC'] for retdict in retdictlist]
     NUlist = [retdict['NU'] for retdict in retdictlist]
